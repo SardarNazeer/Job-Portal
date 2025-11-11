@@ -1,40 +1,58 @@
-import './config/instrument.js'
-import express from 'express'
-import cors from 'cors'
-import 'dotenv/config'
-import connectDB from './config/db.js'
-import * as Sentry from "@sentry/node";
-import { clerkWebhooks } from './controllers/webhooks.js'
+import './config/instrument.js';
+import express from 'express';
+import cors from 'cors';
+import 'dotenv/config';
+import connectDB from './config/db.js';
+import * as Sentry from '@sentry/node';
+import { clerkWebhooks } from './controllers/webhooks.js';
+import companyRoutes from './routes/companyRoutes.js';
+import connectCloudinary from './config/cloudinary.js';
 
+// INITIALIZE EXPRESS
+const app = express();
 
-// INITIALIZE EXPRESS 
+// CONNECT TO MONGODB
+await connectDB();
+await connectCloudinary();
 
-const app = express()
-
-// Connect to DB 
-
-await connectDB()
-
-// MIDDLEWARE 
-
-app.use(cors())
-app.use(express.json())
-
-// ROUTES 
-
-app.get('/',(req,res)=> res.send("API Working"))
-app.get("/debug-sentry", function mainHandler(req, res) {
-  throw new Error("My first Sentry error!");
+// =============================
+// SENTRY INITIALIZATION
+// =============================
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  tracesSampleRate: 1.0,
 });
-
-app.post('/webhooks',clerkWebhooks)
-
-// Port 
-
-const PORT = process.env.PORT || 5000
-
 Sentry.setupExpressErrorHandler(app);
 
-app.listen(PORT,() => {
-    console.log(`Server is running on port ${PORT}`)
-})
+// MIDDLEWARE
+
+// IMPORTANT: For Clerk webhooks, we must parse the raw body, not JSON first
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf.toString(); // Save raw body for Svix verification
+    },
+  })
+);
+
+app.use(cors());
+
+// ROUTES
+app.get('/', (req, res) => res.send('API Working'));
+app.get('/debug-sentry', () => {
+  throw new Error('My first Sentry error!');
+});
+
+// Clerk webhook route
+app.post('/webhooks', clerkWebhooks);
+
+// Company routes
+app.use('/api/company', companyRoutes);
+
+
+// START SERVER
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
