@@ -28,10 +28,10 @@ const jobSchema = new mongoose.Schema(
       required: true,
     },
     date: {
-      type: Date,
-      default: Date.now,
+      type: Number,
+      required: true,
     },
-    isVisible: {
+    visible: {
       type: Boolean,
       default: true,
     },
